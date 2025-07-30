@@ -1,0 +1,126 @@
+# RDF Editor Configuration
+# Copy this file to .env and update with your values
+# cp .env.example .env
+
+# ===================
+# SPARQL Endpoint Configuration
+# ===================
+
+# Required: SPARQL query endpoint (for SELECT, ASK, CONSTRUCT, DESCRIBE)
+SPARQL_ENDPOINT=http://localhost:5820/myDatabase/query
+
+# Optional: SPARQL update endpoint (for INSERT, DELETE, UPDATE)
+# If not specified, will try to auto-derive from query endpoint
+# For Stardog: automatically converts /query to /update
+# SPARQL_UPDATE_ENDPOINT=http://localhost:5820/myDatabase/update
+
+# Authentication (leave blank if not required)
+SPARQL_USERNAME=admin
+SPARQL_PASSWORD=admin
+
+# Alternative: Use base64 encoded password for better security
+# Generate with: cargo run --bin hash_password -- yourpassword
+# SPARQL_PASSWORD_HASHED=YWRtaW4=
+
+# ===================
+# Connection Settings
+# ===================
+
+# Request timeout in seconds (default: 30)
+SPARQL_TIMEOUT=30
+
+# Maximum retry attempts for failed requests (default: 3)
+MAX_RETRIES=3
+
+# SSL certificate verification (default: true)
+# Set to false ONLY for development with self-signed certificates
+VERIFY_SSL=true
+
+# ===================
+# Server Configuration
+# ===================
+
+# Server bind address (default: 127.0.0.1)
+HOST=127.0.0.1
+
+# Server port (default: 8080)
+PORT=8080
+
+# Enable CORS (default: true)
+CORS_ENABLED=true
+
+# Maximum request body size in bytes (default: 10MB)
+MAX_PAYLOAD_SIZE=10485760
+
+# Allowed origins for CORS (comma-separated, * for all)
+ALLOWED_ORIGINS=*
+
+# ===================
+# Performance & Caching
+# ===================
+
+# Enable query result caching (default: true)
+CACHE_ENABLED=true
+
+# Cache time-to-live in seconds (default: 300 = 5 minutes)
+CACHE_TTL=300
+
+# Maximum number of cached entries (default: 1000)
+CACHE_MAX_ENTRIES=1000
+
+# ===================
+# Graph Visualization
+# ===================
+
+# Maximum nodes to display in graph (default: 500)
+GRAPH_MAX_NODES=500
+
+# Maximum edges to display in graph (default: 1000)
+GRAPH_MAX_EDGES=1000
+
+# Maximum nodes to add when expanding a node (default: 50)
+GRAPH_EXPANSION_LIMIT=50
+
+# Maximum search results to return (default: 10)
+GRAPH_SEARCH_LIMIT=10
+
+# ===================
+# Security (Optional)
+# ===================
+
+# Enable API key authentication (default: false)
+ENABLE_AUTH=false
+
+# API key (required if ENABLE_AUTH=true)
+# API_KEY=your-secret-api-key
+
+# ===================
+# Logging
+# ===================
+
+# Log level: trace, debug, info, warn, error (default: info)
+RUST_LOG=info
+
+# ===================
+# Common SPARQL Endpoint Examples
+# ===================
+
+# Stardog (separate query/update endpoints)
+# SPARQL_ENDPOINT=http://localhost:5820/myDatabase/query
+# SPARQL_UPDATE_ENDPOINT=http://localhost:5820/myDatabase/update
+
+# Apache Jena Fuseki (separate query/update endpoints)
+# SPARQL_ENDPOINT=http://localhost:3030/dataset/query
+# SPARQL_UPDATE_ENDPOINT=http://localhost:3030/dataset/update
+
+# GraphDB (single endpoint for both)
+# SPARQL_ENDPOINT=http://localhost:7200/repositories/myrepo
+# SPARQL_UPDATE_ENDPOINT=http://localhost:7200/repositories/myrepo/statements
+
+# Virtuoso (single endpoint for both)
+# SPARQL_ENDPOINT=http://localhost:8890/sparql
+# SPARQL_UPDATE_ENDPOINT=http://localhost:8890/sparql
+
+# Amazon Neptune
+# SPARQL_ENDPOINT=https://your-cluster.region.neptune.amazonaws.com:8182/sparql
+# SPARQL_UPDATE_ENDPOINT=https://your-cluster.region.neptune.amazonaws.com:8182/sparql

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RDF Editor</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>RDF Editor</h1>
+            <div id="connection-status" class="status"></div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-button active" onclick="showTab('query')">Query</button>
+            <button class="tab-button" onclick="showTab('browse')">Browse & Edit</button>
+            <button class="tab-button" onclick="showTab('query-browse')">Query + Browse</button>
+            <button class="tab-button" onclick="showTab('graph')">Graph</button>
+            <button class="tab-button" onclick="showTab('namespaces')">Namespaces</button>
+            <button class="tab-button" onclick="showTab('history')">History</button>
+        </div>
+
+        <!-- Query Tab -->
+        <div id="query-tab" class="tab-content active">
+            <h2>SPARQL Query</h2>
+            <div class="form-group">
+                <label>Target Graph:</label>
+                <select id="query-graph">
+                    <option value="">Default Graph</option>
+                </select>
+            </div>
+            <textarea id="query-input" placeholder="Enter your SPARQL query here...">SELECT * WHERE { ?s ?p ?o } LIMIT 10</textarea>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button onclick="executeQuery()" class="primary-button">Execute Query</button>
+                <button onclick="sendQueryResultsToBrowse()" class="primary-button" id="send-to-browse" style="display: none; background: #28a745;">Send to Browse</button>
+                <button onclick="sendQueryResultsToGraph()" class="primary-button" id="send-to-graph" style="display: none; background: #6c5ce7;">Visualize</button>
+                <label style="font-size: 14px;">
+                    <input type="checkbox" id="show-prefixes" onchange="togglePrefixDisplay()"> Show query with prefixes
+                </label>
+            </div>
+            <div id="full-query" class="full-query" style="display: none;"></div>
+            <div id="query-results" class="results"></div>
+        </div>
+
+        <!-- Browse Tab -->
+        <div id="browse-tab" class="tab-content">
+            <h2>Browse & Edit</h2>
+            <div class="browse-controls">
+                <button onclick="loadGraphs()" class="primary-button">Refresh Graphs</button>
+                <select id="browse-graph-select" onchange="loadSelectedGraph()">
+                    <option value="">Select a graph...</option>
+                </select>
+                <button onclick="visualizeCurrentGraph()" class="primary-button" id="visualize-graph" style="background: #6c5ce7; display: none;">Visualize Graph</button>
+            </div>
+            
+            <div class="filter-controls">
+                <h3>Display Options:</h3>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="filter-classes" checked onchange="filterTriples()"> Classes
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="filter-properties" checked onchange="filterTriples()"> Properties
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="filter-instances" checked onchange="filterTriples()"> Instances
+                </label>
+                <label class="checkbox-label" style="margin-left: 20px;">
+                    <input type="checkbox" id="show-labels" onchange="toggleLabelDisplay()"> Show labels
+                </label>
+                <label class="checkbox-label" style="margin-left: 20px;">
+                    <input type="checkbox" id="enable-editing" onchange="toggleEditMode()"> Enable editing
+                </label>
+            </div>
+            
+            <div id="add-triple-section" style="display: none;">
+                <h3>Add New Triple</h3>
+                <div class="triple-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Subject:</label>
+                            <input type="text" id="add-subject" placeholder="http://example.com/subject">
+                        </div>
+                        <div class="form-group">
+                            <label>Predicate:</label>
+                            <input type="text" id="add-predicate" placeholder="http://example.com/predicate">
+                        </div>
+                    </div>
+                    <button onclick="addTripleFromBrowse()" class="primary-button">Add Triple</button>
+                </div>
+            </div>
+            
+            <div id="browse-results" class="results"></div>
+            
+            <!-- Edit Triple Dialog -->
+            <div id="edit-triple-dialog" class="dialog" style="display: none;">
+                <div class="dialog-content">
+                    <h3>Edit Triple</h3>
+                    <div class="form-group">
+                        <label>Subject:</label>
+                        <input type="text" id="edit-subject" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Predicate:</label>
+                        <input type="text" id="edit-predicate" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Current Object:</label>
+                        <div id="edit-current-object" class="current-value"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>New Object Type:</label>
+                        <select id="edit-object-type" onchange="updateEditObjectInput()">
+                            <option value="uri">URI</option>
+                            <option value="literal">Literal</option>
+                            <option value="blank">Blank Node</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>New Object Value:</label>
+                        <input type="text" id="edit-object-value" placeholder="Enter new value">
+                    </div>
+                    <div id="edit-literal-options" style="display: none;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Language (optional):</label>
+                                <input type="text" id="edit-language" placeholder="en">
+                            </div>
+                            <div class="form-group">
+                                <label>Datatype (optional):</label>
+                                <input type="text" id="edit-datatype" placeholder="http://www.w3.org/2001/XMLSchema#string">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dialog-buttons">
+                        <button onclick="saveEditedTriple()" class="primary-button">Save Changes</button>
+                        <button onclick="cancelEdit()" class="secondary-button">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Combined Query + Browse Tab -->
+        <div id="query-browse-tab" class="tab-content">
+            <h2>Query & Browse</h2>
+            
+            <!-- Collapsible Query Section -->
+            <div class="query-section">
+                <div class="section-header" onclick="toggleQuerySection()">
+                    <span class="toggle-icon" id="query-toggle-icon">▼</span>
+                    <h3>SPARQL Query</h3>
+                </div>
+                
+                <div id="query-section-content" class="section-content">
+                    <div class="form-group">
+                        <label>Target Graph:</label>
+                        <select id="combined-query-graph">
+                            <option value="">Default Graph</option>
+                        </select>
+                    </div>
+                    <textarea id="combined-query-input" placeholder="Enter your SPARQL query here...">SELECT * WHERE { ?s ?p ?o } LIMIT 10</textarea>
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <button onclick="executeCombinedQuery()" class="primary-button">Execute Query</button>
+                        <button onclick="loadResultsIntoBrowse()" class="primary-button" id="load-into-browse" style="display: none; background: #28a745;">Load Results</button>
+                        <label style="font-size: 14px;">
+                            <input type="checkbox" id="combined-show-prefixes" onchange="toggleCombinedPrefixDisplay()"> Show query with prefixes
+                        </label>
+                    </div>
+                    <div id="combined-full-query" class="full-query" style="display: none;"></div>
+                    <div id="combined-query-results" class="results" style="max-height: 300px; overflow-y: auto;"></div>
+                </div>
+            </div>
+            
+            <!-- Browse Section -->
+            <div class="browse-section" style="margin-top: 20px;">
+                <h3>Browse & Edit</h3>
+                <div class="browse-controls">
+                    <button onclick="loadGraphsForCombined()" class="primary-button">Refresh Graphs</button>
+                    <select id="combined-graph-select" onchange="loadSelectedCombinedGraph()">
+                        <option value="">Select a graph...</option>
+                    </select>
+                </div>
+                
+                <div class="filter-controls">
+                    <h4>Display Options:</h4>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="combined-filter-classes" checked onchange="filterCombinedTriples()"> Classes
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="combined-filter-properties" checked onchange="filterCombinedTriples()"> Properties
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="combined-filter-instances" checked onchange="filterCombinedTriples()"> Instances
+                    </label>
+                    <label class="checkbox-label" style="margin-left: 20px;">
+                        <input type="checkbox" id="combined-show-labels" onchange="toggleCombinedLabelDisplay()"> Show labels
+                    </label>
+                    <label class="checkbox-label" style="margin-left: 20px;">
+                        <input type="checkbox" id="combined-enable-editing" onchange="toggleCombinedEditMode()"> Enable editing
+                    </label>
+                </div>
+                
+                <div id="combined-add-triple-section" style="display: none;">
+                    <h3>Add New Triple</h3>
+                    <div class="triple-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Subject:</label>
+                                <input type="text" id="combined-add-subject" placeholder="http://example.com/subject">
+                            </div>
+                            <div class="form-group">
+                                <label>Predicate:</label>
+                                <input type="text" id="combined-add-predicate" placeholder="http://example.com/predicate">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group" style="width: 150px;">
+                                <label>Object Type:</label>
+                                <select id="combined-add-object-type" onchange="updateCombinedObjectInput()">
+                                    <option value="uri">URI</option>
+                                    <option value="literal">Literal</option>
+                                    <option value="blank">Blank Node</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="flex: 1;">
+                                <label>Object Value:</label>
+                                <input type="text" id="combined-add-object-value" placeholder="http://example.com/object">
+                            </div>
+                        </div>
+                        <div id="combined-literal-options" style="display: none;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Language (optional):</label>
+                                    <input type="text" id="combined-add-language" placeholder="en">
+                                </div>
+                                <div class="form-group">
+                                    <label>Datatype (optional):</label>
+                                    <input type="text" id="combined-add-datatype" placeholder="http://www.w3.org/2001/XMLSchema#string">
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="addTripleFromCombined()" class="primary-button">Add Triple</button>
+                    </div>
+                </div>
+                
+                <div id="combined-browse-results" class="results"></div>
+            </div>
+        </div>
+
+        <!-- Graph Tab -->
+        <div id="graph-tab" class="tab-content">
+            <h2>Graph Visualization</h2>
+            <div class="graph-controls">
+                <div class="graph-namespace-section">
+                    <label>Graph/Namespace:</label>
+                    <select id="graph-namespace-select">
+                        <option value="all">All Graphs</option>
+                    </select>
+                </div>
+                <div class="search-section">
+                    <input type="text" id="graph-search" placeholder="Search for a class or instance (min. 3 characters)..." />
+                    <button onclick="searchAndAddNode()" class="primary-button">Add to Graph</button>
+                    <button onclick="clearGraph()" class="secondary-button">Clear Graph</button>
+                </div>
+                <div class="layout-section">
+                    <label>Layout:</label>
+                    <select id="layout-select" onchange="applyLayout()">
+                        <option value="breadthfirst">Hierarchical</option>
+                        <option value="cose">Force Directed</option>
+                        <option value="concentric">Concentric</option>
+                        <option value="grid">Grid</option>
+                    </select>
+                </div>
+            </div>
+            <div id="cy" class="cytoscape-container"></div>
+            <div id="graph-info" class="graph-info">
+                <p>Search for a class or instance to begin visualization. The graph will show class hierarchies and property relationships.</p>
+            </div>
+        </div>
+
+        <!-- Namespaces Tab -->
+        <div id="namespaces-tab" class="tab-content">
+            <h2>Namespace Prefixes</h2>
+            <p class="help-text">Define namespace prefixes to use in your queries. These will be automatically added to the beginning of your SPARQL queries.</p>
+            
+            <div id="namespace-list"></div>
+            
+            <h3>Add Namespace</h3>
+            <div class="namespace-form">
+                <div class="form-group">
+                    <label>Prefix:</label>
+                    <input type="text" id="new-prefix" placeholder="ex">
+                </div>
+                <div class="form-group">
+                    <label>URI:</label>
+                    <input type="text" id="new-uri" placeholder="http://example.com/">
+                </div>
+                <button onclick="addNamespace()" class="primary-button">Add Namespace</button>
+            </div>
+            
+            <h3>Common Namespaces</h3>
+            <div class="common-namespaces">
+                <button onclick="addCommonNamespace('rdf', 'http://www.w3.org/1999/02/22-rdf-syntax-ns#')" class="secondary-button">Add RDF</button>
+                <button onclick="addCommonNamespace('rdfs', 'http://www.w3.org/2000/01/rdf-schema#')" class="secondary-button">Add RDFS</button>
+                <button onclick="addCommonNamespace('owl', 'http://www.w3.org/2002/07/owl#')" class="secondary-button">Add OWL</button>
+                <button onclick="addCommonNamespace('xsd', 'http://www.w3.org/2001/XMLSchema#')" class="secondary-button">Add XSD</button>
+                <button onclick="addCommonNamespace('skos', 'http://www.w3.org/2004/02/skos/core#')" class="secondary-button">Add SKOS</button>
+                <button onclick="addCommonNamespace('foaf', 'http://xmlns.com/foaf/0.1/')" class="secondary-button">Add FOAF</button>
+                <button onclick="addCommonNamespace('dc', 'http://purl.org/dc/elements/1.1/')" class="secondary-button">Add DC</button>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div id="history-tab" class="tab-content">
+            <h2>Transaction History</h2>
+            <p class="help-text">View recent changes and undo individual operations. Batch operations and graph drops cannot be undone automatically.</p>
+            
+            <button onclick="loadTransactionHistory()" class="primary-button">Refresh History</button>
+            
+            <div id="transaction-list" class="transaction-list">
+                <div class="loading">Loading transaction history</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+                    <div class="form-row">
+                        <div class="form-group" style="width: 150px;">
+                            <label>Object Type:</label>
+                            <select id="add-object-type" onchange="updateObjectInput()">
+                                <option value="uri">URI</option>
+                                <option value="literal">Literal</option>
+                                <option value="blank">Blank Node</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1;">
+                            <label>Object Value:</label>
+                            <input type="text" id="add-object-value" placeholder="http://example.com/object">
+                        </div>
+                    </div>
+                    <div id="literal-options" style="display: none;">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Language (optional):</label>
+                                <input type="text" id="add-language" placeholder="en">
+                            </div>
+                            <div class="form-group">
+                                <label>Datatype (optional):</label>
+                                <input type="text" id="add-datatype" placeholder="http://www.w3.org/2001/XMLSchema#string">
+                            </div>
+                        </div>
